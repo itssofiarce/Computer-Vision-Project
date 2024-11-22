@@ -1,0 +1,4 @@
+mediapipe-model-maker
+numpy
+opencv-python
+torch
