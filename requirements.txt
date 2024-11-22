@@ -1,4 +1,4 @@
 mediapipe-model-maker
 numpy
-opencv-python
+python3-opencv
 torch
