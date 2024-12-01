@@ -43,7 +43,7 @@ def data_collection(actions, DATA_PATH, no_sequences, sequence_length, start_fol
                     if frame_num == 0: 
                         cv2.putText(image, 'STARTING COLLECTION', (400,300), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255, 0), 4, cv2.LINE_AA)
-                        cv2.putText(image, 'Collecting frames for {} Video Number {}'.format(action, sequence), (200,50), 
+                        cv2.putText(image, f'Collecting frames for {action} Video Number {sequence}', (200,50), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 4, cv2.LINE_AA)
                         
                         cv2.imshow('OpenCV Feed', image)

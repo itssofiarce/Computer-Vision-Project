@@ -2,27 +2,17 @@ import os
 import shutil
 import time
 import mediapipe as mp
-import utils.dataCollection as dataCollection
+import utils.datacollection as dataCollection
 from utils.actions import all_actions_training
-
-def get_paremeters():
-    '''
-    Seteo de parametros para el armado del dataset
-    '''
-    parameters = {
-        'DATA_PATH': os.path.join('data/'),
-        'no_sequences': 50,
-        'start_folder': 1,
-        'sequence_length': 30,
-        'num_epochs': 70,
-        'batch_size': 8
-    }
-    return parameters
-
+from utils.params_dataset import get_paremeters
 
 # Armado de dataset:
 #   - Grabaciones con la webcam. 
 #   - Cada acción se guardará en una carpeta específica
+
+
+mp_holistic = mp.solutions.holistic
+mp_drawing = mp.solutions.drawing_utils
 
 DATA_PATH = get_paremeters()['DATA_PATH']
 actions = all_actions_training() # acciones a detectar
@@ -38,7 +28,7 @@ if os.path.isdir(DATA_PATH):
     if user_input in ["si", "y", "s"]:
         # Limpio el directorio        
         shutil.rmtree(DATA_PATH)
-        print("TSe borró el directorio y su contenido.")
+        print("Se borró el directorio y su contenido.")
         os.makedirs(DATA_PATH)
         for i in range(len(actions)):
             os.makedirs(os.path.join(DATA_PATH, actions[i]))
