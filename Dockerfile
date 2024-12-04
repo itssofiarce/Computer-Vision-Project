@@ -1,10 +1,14 @@
 #FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 as base
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 ENV TERM=xterm
 ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /
 
-RUN apt-get update && apt-get install -y \
-    pip install -no-cache-dir --upgrade -r /app/requirements.txt
+COPY requirements.txt /requirements.txt
+
+# install app dependencies
+RUN apt-get update && apt-get install -y python3 python3-pip
+
+RUN pip install -r /requirements.txt
