@@ -10,7 +10,7 @@ def action_fullname(action):
     if action == 'pointL':
         return 'Punto Izquierda'
     elif action == 'pointR':
-        return 'Point Derecha'
+        return 'Punto Derecha'
     elif action == 'Substi':
         return 'Cambio'
     elif action == 'DbHit':

@@ -1,4 +1,5 @@
 mediapipe-model-maker
 numpy
 opencv-python
-torch
+numpy
+matplotlib

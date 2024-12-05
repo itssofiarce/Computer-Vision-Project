@@ -12,8 +12,10 @@ def pre_processing(actions, DATA_PATH, sequence_length):
                 window.append(res)
             sequences.append(window)
             sig_label = [0]*(len(actions)-1) # -1 because we don't want to include the 'Nothing' action
-            if action != 'Nothing':
+            if action != 'Nada':
                 sig_label[label_map[action]] = 1
             labels.append(sig_label)
+
+    print("Shape sequences:", np.array(sequences).shape)
             
     return sequences, labels

@@ -6,7 +6,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /
 
-COPY requirements.txt /requirements.txt
+COPY requirements.txt  /requirements.txt
+COPY data/* models/* utils/* /app/
 
 # install app dependencies
 RUN apt-get update && apt-get install -y python3 python3-pip
