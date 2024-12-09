@@ -1,15 +1,26 @@
-#FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 as base
-FROM ubuntu:22.04
+# app/Dockerfile
 
-ENV TERM=xterm
-ENV DEBIAN_FRONTEND=noninteractive
+FROM python:3.10-slim 
+#puse 3.10
 
-WORKDIR /
+WORKDIR /app
+RUN pip3 install streamlit
+COPY . .
 
-COPY requirements.txt  /requirements.txt
-COPY data/* models/* utils/* /app/
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    software-properties-common \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
-# install app dependencies
-RUN apt-get update && apt-get install -y python3 python3-pip
+#RUN git clone https://github.com/streamlit/streamlit-example.git .
 
-RUN pip install -r /requirements.txt
+RUN pip3 install -r requirements.txt
+
+EXPOSE 8501
+
+HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health
+
+ENTRYPOINT ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+

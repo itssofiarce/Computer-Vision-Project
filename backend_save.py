@@ -1,28 +1,24 @@
 import cv2
 import numpy as np
+import tensorflow as tf
+import tempfile
 import mediapipe as mp
-import tensorflow as tf 
-from tensorflow.keras.models import load_model
+from io import BytesIO
 import utils.extraction as extraction
 import utils.poseDetection as poseDetection
 from utils.actions import action_fullname, all_actions
 
-################################################
-# Try the model in real time on your webcam
-################################################
-
 def prob_viz(res, actions, input_frame):
     output_frame = input_frame.copy()
     for num, prob in enumerate(res):
-        # Display action and probability for each action
+        # Convert TensorFlow tensor to NumPy scalar and display the probability
         cv2.putText(output_frame, action_fullname(actions[num]) + ': ' + str(round(prob.numpy(), 2)), 
                     (0, 185 + num * 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
     return output_frame
 
-def main(ViewProbabilities=True, ViewLandmarks=True):
-
+def ActionDetectionVideo(video_bytes, ViewProbabilities=False, ViewLandmarks=False, output_path='output_video.mp4'):
     actions = all_actions()
-    model = tf.keras.models.load_model('mi_modelo.keras')    
+    model = tf.keras.models.load_model('mi_modelo.keras')
     model.summary()
 
     sequence = []
@@ -35,53 +31,56 @@ def main(ViewProbabilities=True, ViewLandmarks=True):
 
     last_detected_action = None  # Track the last detected action
 
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+    # Create a temporary file for video input
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_input_file:
+        temp_input_path = temp_input_file.name
+        temp_input_file.write(video_bytes.getvalue())
 
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    input_video = cv2.VideoCapture(temp_input_path)
+    frame_width = int(input_video.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(input_video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = input_video.get(cv2.CAP_PROP_FPS)
+
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
     mp_holistic = mp.solutions.holistic
-
+    
     with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
-        while cap.isOpened(): 
-            ret, frame = cap.read()
+        while True:
+            ret, frame = input_video.read()
             if not ret:
                 break
-
+            
             image, results = poseDetection.mediapipe_detection(frame, holistic)
-            
             if ViewLandmarks:
-                poseDetection.draw_landmarks(image, results)  # Show landmarks on video
+                poseDetection.draw_landmarks(image, results)
             
-            # Extract keypoints from the detected pose
             keypoints = extraction.extract_keypoints(results)
             sequence.append(keypoints)
-            sequence = sequence[-30:]  # Keep last 30 frames in sequence
-
+            sequence = sequence[-30:]
+            
             if len(sequence) == 30:
                 # Prepare the sequence for model prediction
                 sequence_tensor = np.expand_dims(np.array(sequence), axis=0)
-               
-                # Make a prediction for the current sequence
+
                 res = model(sequence_tensor)[0]
-                predicted_label = np.argmax(res)  # Get the index of the max probability
-                proba = res[predicted_label].numpy()  # Get the probability of the predicted label
+                predicted_label = np.argmax(res)
+                proba = res[predicted_label].numpy() 
 
                 if proba > threshold: 
                     predictions.append(predicted_label)
 
-                # Ensure that the last 15 out of 20 predictions are consistent
+                # Check if at least 15 out of the last 20 predictions are the same as the predicted label
                 if predictions[-15:].count(predicted_label) >= 12:
-                    if len(sentence) > 0: 
-                        if actions[predicted_label] != sentence[-1]:
-                            sentence.append(actions[predicted_label])               
+                        if len(sentence) > 0: 
+                            if actions[predicted_label] != sentence[-1]:
+                                sentence.append(actions[predicted_label])               
+                                printed_sentence.append(action_fullname(actions[predicted_label]))
+                        else:
+                            sentence.append(actions[predicted_label])
                             printed_sentence.append(action_fullname(actions[predicted_label]))
-                    else:
-                        sentence.append(actions[predicted_label])
-                        printed_sentence.append(action_fullname(actions[predicted_label]))
-
+        
                 # Increment score based on detected action (Punto Izquierda or Punto Derecha)
                 current_action = printed_sentence[-1] if len(printed_sentence) > 0 else None
 
@@ -89,21 +88,20 @@ def main(ViewProbabilities=True, ViewLandmarks=True):
                 if current_action != last_detected_action:
                     if current_action == "Punto Izquierda":
                         score_left += 1
-                        print(f"Left score: {score_left}")
                     elif current_action == "Punto Derecha":
                         score_right += 1
-                        print(f"Right score: {score_right}")
 
                     # Update the last detected action
                     last_detected_action = current_action
-
+                
+                
                 if len(sentence) > 3: 
                     sentence = sentence[-3:]
                     printed_sentence = printed_sentence[-3:]
 
                 if ViewProbabilities:
                     image = prob_viz(res, actions, image)
-                
+            
             # Draw a rectangle and text to show the score at the top center of the frame
             rect_x1, rect_x2 = (frame_width - 900) // 2, (frame_width + 900) // 2
             rect_y1, rect_y2 = 0, 50  # Position at the top of the frame
@@ -114,31 +112,39 @@ def main(ViewProbabilities=True, ViewLandmarks=True):
                         (frame_width // 2 - 150, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, 
                         (255, 255, 255), 2, cv2.LINE_AA)
             
-            # Display the sentence (actions detected so far)
+            
+            # Draw the sentence on the frame
             rect_x1, rect_x2 = (frame_width - 900) // 2, (frame_width + 900) // 2
             rect_y1, rect_y2 = frame_height - 110, frame_height -50
             text_size = cv2.getTextSize(' -> '.join(printed_sentence), cv2.FONT_HERSHEY_SIMPLEX, 1, 2)[0]
             text_x = (frame_width - text_size[0]) // 2
 
             cv2.rectangle(image, (rect_x1, rect_y1), (rect_x2, rect_y2), (40, 40, 40), -1)
-            cv2.putText(image, ' -> '.join(printed_sentence), (text_x, frame_height -70), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.putText(image, ' -> '.join(printed_sentence), (text_x, frame_height -70), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
             
-            # Display the video feed
-            cv2.imshow('OpenCV Feed', image)
+            # Write the processed frame to the output video
+            out.write(image)
             
-            # Check if the score reaches 25 for any side and print results
-            if score_left >= 25 or score_right >= 25:
-                print("Felicidades!")
-                print(f"Puntos: {score_left} : {score_right}")
-                break
+        # Release the video and output objects
+        input_video.release()
+        out.release()
+    # Return the output video file path
+    return output_path
 
-            # q to quit
-            if cv2.waitKey(10) & 0xFF == ord('q'):
-                break
-        
-        cap.release()
-        cv2.destroyAllWindows()
-
-if __name__ == '__main__':
-    main(ViewProbabilities=True, ViewLandmarks=True)
+#def processing_video(uploaded_file_path, ViewProbabilities, ViewLandmarks, output_path='output_video.mp4'):
+#    # Read the uploaded video file
+#    with open(uploaded_file_path, 'rb') as f:
+#        video_bytes = BytesIO(f.read())
+#
+#    # Process the video and save the output
+#    processed_video_path = ActionDetectionVideo(video_bytes, ViewProbabilities, ViewLandmarks, output_path)
+#    return processed_video_path
+#
+## File path for the uploaded video
+#uploaded_file_path = '/home/soifa/repos/Computer-Vision-Project/prueba.MOV'
+#output_path = '/home/soifa/repos/Computer-Vision-Project/processed_video.mp4'
+#
+## Process and save the video
+#processed_video_path = processing_video(uploaded_file_path, True, True, output_path)
+#
+#print(f"Processed video saved at: {processed_video_path}")
